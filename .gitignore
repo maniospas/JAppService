@@ -4,3 +4,4 @@ jsapp/downloads/
 target/
 .project
 .classpath
+jsapp/token.txt
