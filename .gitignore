@@ -1,0 +1,6 @@
+downloads/
+jsapp/downloads/
+.settings/
+target/
+.project
+.classpath

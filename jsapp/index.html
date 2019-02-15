@@ -1,0 +1,155 @@
+<html>
+	<head>
+		<title>App</title>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+		<script src="https://d3js.org/d3.v5.min.js"></script>
+		<style>
+			h1   {color: red; font-size: 2.5em;}
+			div.reponame {color: blue; font-size: 1.5em;margin: 1px;}
+			.repoinputs{ font-size: 1.2em; width: 40vw;margin: 1px;}
+			#status{ font-size: 1.2em; width: 40vw;margin: 1px;margin-top:2em;color:white;}
+			#results{ font-size: 1.2em; width: 40vw;margin: 1px;}
+			#compare {font-size: 1.5em; width: 40vw;height:2em;}
+			
+			.vertical .progress-bar {float: left;height: 300px;width: 7vw;margin-left: 1vw;margin-right: 1vw;}
+			.vertical .progress-track {position: relative;width: 6vw;height: 100%;background: #ebebeb;}
+			.vertical .progress-fill {position: relative;background: #825;height: 50%;width: 6vw;color: #fff;text-align: center;
+								font-family: "Lato","Verdana",sans-serif;font-size: 1em;line-height: 20px;}
+			.rounded .progress-track,
+			.rounded .progress-fill {box-shadow: inset 0 0 5px rgba(0,0,0,.2);border-radius: 3px;}
+			.container {width: 36vw;margin: 20px; background: #fff;padding: 20px;overflow: hidden;}
+			h2 {margin: 0 0 20px 0;padding: 0 0 5px 0;border-bottom: 1px solid #999;font-family: sans-serif;font-weight: normal;color: #333;}
+		</style>
+		<script>
+			function visualizeData(outcome) {
+				outcome = JSON.parse(outcome);
+				htmlbody = "<div class=\"container vertical flat\"><h2>Similarities</h2>";
+				htmlbody = htmlbody + "<div class=\"progress-bar\"><div class=\"progress-track\"><div class=\"progress-fill\"><span class=\"value\">"+Math.round(outcome["Tree Similarity"]*100)+"%</span></div></div><span class=\"bardescription\">Call Tree</span></div>";
+				htmlbody = htmlbody + "<div class=\"progress-bar\"><div class=\"progress-track\"><div class=\"progress-fill\"><span class=\"value\">"+Math.round(outcome["File Token Similarity"]*100)+"%</span></div></div><span class=\"bardescription\">File Text</span></div>";
+				htmlbody = htmlbody + "<div class=\"progress-bar\"><div class=\"progress-track\"><div class=\"progress-fill\"><span class=\"value\">"+Math.round(outcome["Function Token Similarity"]*100)+"%</span></div></div><span class=\"bardescription\">Function Text</span></div>";
+				htmlbody = htmlbody + "<div class=\"progress-bar\"><div class=\"progress-track\"><div class=\"progress-fill\"><span class=\"value\">"+Math.round(outcome["LSA Similarity"]*100)+"%</span></div></div><span class=\"bardescription\">LSA</span></div>";
+				htmlbody = htmlbody + "</div>";
+				$("#results").html(htmlbody);
+
+				
+				$('.vertical .progress-fill span').each(function(){
+				  var percent = $(this).html();
+				  var pTop = 100 - ( percent.slice(0, percent.length - 1) ) + "%";
+				  $(this).parent().css({
+					'height' : percent,
+					'top' : pTop
+				  });
+				});
+			}
+			
+			const url = "localhost:8080/algorithms/compare/requests"
+			var currentwaiting = null;
+			function cancelWaiting() {
+				if(currentwaiting!=null) {
+					$("#countdown").text("(resend to check for outcome)");
+					clearTimeout(currentwaiting);
+					$(".stopwaiting").hide();
+				}
+			}		
+			function getResultFromId (resultid, prevstatus="", repeats=20) {
+				$.get(url+"/"+resultid, function(result) {
+					var status = result["status"];
+					var outcome = result["outcome"];
+					if(status!="Failed" && outcome.includes("Exception:")) {
+						status = "Algorithm Error"
+					}
+					if(status!=prevstatus) {
+						$("#status").hide()
+						$("#results").hide()
+						if (status=="Finished") {
+							$("#status").css("background-color", "green");
+						} else if (status=="Pending" || status=="Running") {
+							$("#status").css("background-color", "orange");
+						} else {
+							$("#status").css("background-color", "tomato");
+						}
+						if(status=="Pending" || status=="Running") {
+							$("#status").html("<b>" + status + " <span id=\"countdown\">(updates "+repeats+")</span></b><div style=\"float: right;\"><input type=\"button\" class=\"stopwaiting\" value=\"Stop Updating\"/></div>");
+							if(outcome.length>0) {
+								$("#results").html("<div align=\"left\" class=\"println\">"+outcome+"</div>");
+							}				
+							else {
+								$("#results").html("");
+							}
+							$(".stopwaiting").click(function() {
+								cancelWaiting();
+							});
+							$("#status").fadeIn();
+							$("#results").fadeIn();
+						} else if(status!="Finished") {
+							$("#status").html("<b>" + status + "</b><br/>" + outcome);
+							$("#results").html("");
+							$("#status").fadeIn();
+							$("#results").fadeIn();
+						} else {
+							$("#status").html("");
+							visualizeData(outcome);
+							$("#results").fadeIn();
+						}
+					}
+					else if(status=="Pending" || status=="Running") {
+						if(outcome.length>0) {
+							$("#results").html("<div align=\"left\" class=\"println\">"+outcome+"</div>");
+						}				
+						else {
+							$("#results").html("");
+						}	
+					}
+					if(status=="Pending" || status=="Running") {
+						if (repeats>0) {
+							$("#countdown").text("(updates "+repeats+")");
+							currentwaiting = setTimeout(function(){getResultFromId(resultid, status, repeats-1);}, 2000);
+						}
+						else {
+							$("#countdown").text("(resend to check for outcome)");
+							$(".stopwaiting").hide();
+						}
+					}
+				})
+				.fail(function( jqXHR, textStatus, errorThrown ) {
+					$("#status").html("<b>" + errorThrown + "</b>");
+					$("#results").html("");
+					$("#status").fadeIn();
+					$("#results").fadeIn();
+				});
+			};
+			$(document).ready(function() {
+				$("#status").hide()
+				$("#results").hide()
+				$("#compare").click(function() {
+					cancelWaiting();
+					var data = { repo1: $("#repo1").val(), repo2: $("#repo2").val()}
+					data = "\""+JSON.stringify(data)+"\""
+					$.post(url, data, function(resultid,status) {
+						getResultFromId(resultid);
+					})
+					.fail(function( jqXHR, textStatus, errorThrown ) {
+						$("#status").html("<b>" + errorThrown + "</b>");
+						$("#results").html("");
+						$("#status").fadeIn();
+						$("#results").fadeIn();
+					});
+				});
+			});
+		</script>
+	</head>
+	<body>
+		<center>
+		<div class="reponame">Repository URLs</div>
+		<input type="text" id="repo1" class="repoinputs"/><br/>
+		<input type="text" id="repo2" class="repoinputs"/><br/>
+		<br/>
+		<input type="button" id="compare" value="Compare repositories"/>
+		
+		<br/>
+		
+		<div id="status"></div>
+		<div id="results"></div>
+		</center>
+	</body>
+</html>
