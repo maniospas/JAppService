@@ -23,6 +23,6 @@ Then, the project should be exported as an Executable Jar (so that the main clas
 TODO
 
 ## Execution Model
-Requests recieved through POST operations are inserted in a queue and are assigned a *Pending* status. When a request is polled and passed to the algorithm, it is assigned a *Running* status and its outcome is constantly updated from the console. When the algorithm has successfully run the request, it is annotated as "Finished" and its output is set as outcome. If an exception has occured, a "Failed" status is returned and the outcome is set to its description.
+Requests recieved through POST operations are inserted in a queue and are assigned a "Pending" status. When a request is polled and passed to the algorithm, it is assigned a *Running* status and its outcome is constantly updated from the console. When the algorithm has successfully run the request, it is annotated as "Finished" and its output is set as outcome. If an exception has occured, a "Failed" status is returned and the outcome is set to its description.
 
 Post requests donnot require the algorithm to finish running before returning the request id. This means that a client needs to periodically us the returned request id to GET the request's status.
